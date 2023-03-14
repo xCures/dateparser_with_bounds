@@ -66,13 +66,13 @@ class FreshnessDateDataParser:
                 if now.tzinfo:
                     now = now.astimezone(ptz)
                 else:
-                    if hasattr(ptz, 'localize'):
+                    if False: #hasattr(ptz, 'localize'):
                         now = ptz.localize(now)
                     else:
                         now = now.replace(tzinfo=ptz)
 
             if not now.tzinfo:
-                if hasattr(self.get_local_tz(), 'localize'):
+                if False: #hasattr(self.get_local_tz(), 'localize'):
                     now = self.get_local_tz().localize(now)
                 else:
                     now = now.replace(tzinfo=self.get_local_tz())

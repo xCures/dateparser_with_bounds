@@ -6,9 +6,11 @@ from collections import OrderedDict
 from dateutil import parser
 
 from dateparser.timezone_parser import pop_tz_offset_from_string, word_is_tz
-from dateparser.utils import normalize_unicode, combine_dicts
+from dateparser.utils import normalize_unicode, combine_dicts, StrWithBounds, re_split_with_bounds, re_sub_with_bounds, join_with_bounds, strip_with_bounds
 
 from .dictionary import Dictionary, NormalizedDictionary, ALWAYS_KEEP_TOKENS
+
+import warnings
 
 NUMERAL_PATTERN = re.compile(r'(\d+)', re.U)
 
@@ -130,15 +132,18 @@ class Locale:
         relative_translations = self._get_relative_translations(settings=settings)
 
         for i, word in enumerate(date_string_tokens):
-            word = word.lower()
+            word = StrWithBounds(word.lower(), word.start, word.end)
             for pattern, replacement in relative_translations.items():
                 if pattern.match(word):
                     date_string_tokens[i] = pattern.sub(replacement, word)
                     break
             else:
                 if word in dictionary:
-                    fallback = word if keep_formatting and not word.isalpha() else ''
-                    date_string_tokens[i] = dictionary[word] or fallback
+                    if keep_formatting and not word.isalpha():
+                        fallback = word  
+                    else:
+                        fallback = StrWithBounds('', word.start, word.end)
+                    date_string_tokens[i] = dictionary.get_with_bounds(word) or fallback
         if "in" in date_string_tokens:
             date_string_tokens = self._clear_future_words(date_string_tokens)
 
@@ -189,7 +194,7 @@ class Locale:
             last_token_index = len(simplified_tokens) - 1
             skip_next_token = False
             for i, word in enumerate(simplified_tokens):
-                next_word = simplified_tokens[i + 1] if i < last_token_index else ""
+                next_word = simplified_tokens[i + 1] if i < last_token_index else StrWithBounds("", word.start, word.end)
                 current_and_next_joined = self._join_chunk([word, next_word], settings=settings)
                 if skip_next_token:
                     skip_next_token = False
@@ -203,20 +208,20 @@ class Locale:
                     and word not in dashes
                     and self.shortname not in word_joint_unsupported_languages
                 ):
-                    translated_chunk.append(dictionary[current_and_next_joined])
+                    translated_chunk.append(dictionary.get_with_bounds(current_and_next_joined))
                     original_chunk.append(
                         self._join_chunk([original_tokens[i], original_tokens[i + 1]], settings=settings)
                     )
                     skip_next_token = True
                 elif word in dictionary and word not in dashes:
-                    translated_chunk.append(dictionary[word])
+                    translated_chunk.append(dictionary.get_with_bounds(word))
                     original_chunk.append(original_tokens[i])
-                elif word.strip('()\"\'{}[],.،') in dictionary and word not in dashes:
-                    punct = word[len(word.strip('()\"\'{}[],.،')):]
-                    if punct and dictionary[word.strip('()\"\'{}[],.،')]:
-                        translated_chunk.append(dictionary[word.strip('()\"\'{}[],.،')] + punct)
+                elif strip_with_bounds(word, '()\"\'{}[],.،') in dictionary and word not in dashes:
+                    punct = word[len(strip_with_bounds(word, '()\"\'{}[],.،')):]
+                    if punct and dictionary.get_with_bounds(strip_with_bounds(word, '()\"\'{}[],.،')):
+                        translated_chunk.append(dictionary.get_with_bounds(strip_with_bounds(word, '()\"\'{}[],.،')) + punct)
                     else:
-                        translated_chunk.append(dictionary[word.strip('()\"\'{}[],.،')])
+                        translated_chunk.append(dictionary.get_with_bounds(strip_with_bounds(word, '()\"\'{}[],.،')))
                     original_chunk.append(original_tokens[i])
                 elif self._token_with_digits_is_ok(word):
                     translated_chunk.append(word)
@@ -271,10 +276,10 @@ class Locale:
                           6: r'[\r\n؟!\.…]+(?:\s|$)+'}  # Arabic and Farsi
         if 'sentence_splitter_group' not in self.info:
             split_reg = abbreviation_string + splitters_dict[1]
-            sentences = re.split(split_reg, string)
+            sentences = re_split_with_bounds(split_reg, string)
         else:
             split_reg = abbreviation_string + splitters_dict[self.info['sentence_splitter_group']]
-            sentences = re.split(split_reg, string)
+            sentences = re_split_with_bounds(split_reg, string)
 
         sentences = filter(None, sentences)
         return sentences
@@ -289,38 +294,49 @@ class Locale:
 
         elif len(original_tokens) < len(simplified_tokens):
             add_empty = False
+            start = end = 0 
             for i, token in enumerate(simplified_tokens):
                 if i < len(original_tokens):
                     if token == normalize_unicode(original_tokens[i].lower()):
                         add_empty = False
+                        start, end = token.start, token.end
                     else:
                         if not add_empty:
                             add_empty = True
+                            start, end = token.start, token.end
                             continue
                         else:
-                            original_tokens.insert(i, '')
+                            original_tokens.insert(i, StrWithBounds('', start, end))
+                            start, end = token.start, token.end
                 else:
-                    original_tokens.insert(i, '')
+                    start, end = token.start, token.end
+                    original_tokens.insert(i, StrWithBounds('', start, end))
         else:
             add_empty = False
+            start = end = 0 
             for i, token in enumerate(original_tokens):
                 if i < len(simplified_tokens):
                     if normalize_unicode(token.lower()) == simplified_tokens[i]:
                         add_empty = False
+                        start, end = token.start, token.end
                     else:
                         if not add_empty:
                             add_empty = True
+                            start, end = token.start, token.end
                             continue
                         else:
-                            simplified_tokens.insert(i, '')
+                            simplified_tokens.insert(i, StrWithBounds('', start, end))
                 else:
-                    simplified_tokens.insert(i, '')
+                    start, end = token.start, token.end
+                    simplified_tokens.insert(i, StrWithBounds('', start, end))
 
         while len(original_tokens) != len(simplified_tokens):
             if len(original_tokens) > len(simplified_tokens):
                 original_tokens.remove('')
             else:
                 simplified_tokens.remove('')
+        assert all(isinstance(s, StrWithBounds) for s in original_tokens), f"original_tokens: {[isinstance(s, StrWithBounds) for s in original_tokens]}\n{original_tokens}"
+        assert all(isinstance(s, StrWithBounds) for s in simplified_tokens), f"simplified_tokens: {[isinstance(s, StrWithBounds) for s in simplified_tokens]}\n{simplified_tokens}"
         return original_tokens, simplified_tokens
 
     def _get_split_dictionary(self, settings):
@@ -334,7 +350,7 @@ class Locale:
         newdict = {}
         for item in dictionary:
             if ' ' in item:
-                items = item.split()
+                items = re_split_with_bounds(" ",item)
                 for i in items:
                     newdict[i] = dictionary[item]
             else:
@@ -345,7 +361,7 @@ class Locale:
         if 'no_word_spacing' in self.info:
             return self._split(string, keep_formatting=True, settings=settings)
         else:
-            return string.split()
+            return re_split_with_bounds(" ",string)
 
     def _split(self, date_string, keep_formatting, settings=None):
         tokens = [date_string]
@@ -357,7 +373,7 @@ class Locale:
     def _split_tokens_with_regex(self, tokens, regex):
         tokens = tokens[:]
         for i, token in enumerate(tokens):
-            tokens[i] = re.split(regex, token)
+            tokens[i] = re_split_with_bounds(regex, token)
         return filter(bool, chain.from_iterable(tokens))
 
     def _split_tokens_by_known_words(self, tokens, keep_formatting, settings=None):
@@ -370,7 +386,7 @@ class Locale:
         if 'no_word_spacing' in self.info:
             return self._join(chunk, separator="", settings=settings)
         else:
-            return re.sub(r'\s{2,}', ' ', " ".join(chunk))
+            return re_sub_with_bounds(r'\s{2,}', ' ', join_with_bounds(" ", chunk, "_join_chunk"))
 
     def _token_with_digits_is_ok(self, token):
         if 'no_word_spacing' in self.info:
@@ -453,7 +469,19 @@ class Locale:
                 joined += separator
             joined += right
 
-        return joined
+        if isinstance(tokens[0], StrWithBounds):
+            start = tokens[0].start
+            for token in tokens:
+                try:
+                    end = token.end
+                except:
+                    pass
+            if len(joined) > end-start:
+                pass #warnings.warn(f"_join len: {joined} {len(joined)} {end-start}")
+            return StrWithBounds(joined, start, end)
+        else:
+            #warnings.warn("Running _join on a str (without bounds).")
+            return joined
 
     def _get_dictionary(self, settings=None):
         if not settings.NORMALIZE:

@@ -2,7 +2,9 @@ from itertools import chain, zip_longest
 from operator import methodcaller
 import regex as re
 
-from dateparser.utils import normalize_unicode
+import warnings
+
+from dateparser.utils import normalize_unicode, StrWithBounds, re_split_with_bounds, re_sub_with_bounds, join_with_bounds, re_match_with_bounds
 
 PARSER_HARDCODED_TOKENS = [":", ".", " ", "-", "/"]
 PARSER_KNOWN_TOKENS = ["am", "pm", "UTC", "GMT", "Z"]
@@ -133,7 +135,7 @@ class Dictionary:
         split_relative_regex = self._get_split_relative_regex_cache()
         match_relative_regex = self._get_match_relative_regex_cache()
 
-        tokens = split_relative_regex.split(string)
+        tokens = re_split_with_bounds(split_relative_regex, string)
 
         for i, token in enumerate(tokens):
             if match_relative_regex.match(token):
@@ -148,7 +150,7 @@ class Dictionary:
             return string
 
         regex = self._get_split_regex_cache()
-        match = regex.match(string)
+        match = re_match_with_bounds(regex, string)
         if not match:
             return (self._split_by_numerals(string, keep_formatting)
                     if self._should_capture(string, keep_formatting) else [])
@@ -163,7 +165,7 @@ class Dictionary:
         return splitted
 
     def _split_by_numerals(self, string, keep_formatting):
-        return [token for token in NUMERAL_PATTERN.split(string)
+        return [token for token in re_split_with_bounds(NUMERAL_PATTERN, string)
                 if self._should_capture(token, keep_formatting)]
 
     def _should_capture(self, token, keep_formatting):
@@ -241,6 +243,13 @@ class Dictionary:
             self._settings.registry_key, {})[self.info['name']] = \
             re.compile(regex, re.UNICODE | re.IGNORECASE)
 
+    def get_with_bounds(self, key):
+        if type(key) is str:
+            warnings.warn(f"get_w_bounds using str: {key}")
+            return self[key]
+        
+        return StrWithBounds(self[key], key.start, key.end)
+
 
 class NormalizedDictionary(Dictionary):
 
@@ -263,3 +272,10 @@ class NormalizedDictionary(Dictionary):
                 new_dict[normalized] = self._dictionary[key]
         self._dictionary = new_dict
         self._relative_strings = list(map(normalize_unicode, self._relative_strings))
+
+    def get_with_bounds(self, key):
+        if type(key) is str:
+            warnings.warn(f"get_w_bounds using str: {key}")
+            return self[key]
+        
+        return StrWithBounds(self[key], key.start, key.end)
