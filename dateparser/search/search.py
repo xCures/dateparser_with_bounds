@@ -14,6 +14,8 @@ RELATIVE_REG = re.compile("(ago|in|from now|tomorrow|today|yesterday)")
 
 HERE_I_AM = "2"
 
+MIN_DATE_LENGTH = 6
+
 def date_is_relative(translation):
     return re.search(RELATIVE_REG, translation) is not None
 
@@ -149,6 +151,8 @@ class _ExactLanguageSearch:
         return parsed, substrings
 
     def search_parse(self, shortname, text, settings):
+        if len(text) < MIN_DATE_LENGTH:
+            return []
         translated, original = self.search(shortname, text, settings)
         bad_translate_with_search = ['vi', 'hu']   # splitting done by spaces and some dictionary items contain spaces
         if shortname not in bad_translate_with_search:

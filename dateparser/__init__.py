@@ -1,4 +1,4 @@
-__version__ = '1.1.9'
+__version__ = '1.2.0' # Bumped from 1.1.9 because now short-circuits search for strings with len<6
 
 from .date import DateDataParser
 from .conf import apply_settings
