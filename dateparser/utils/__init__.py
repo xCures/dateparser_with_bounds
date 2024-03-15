@@ -399,6 +399,7 @@ def strip_with_bounds(string, to_strip = r"\s"):
         start = string.start
         end = string.end
     stripped = string.strip(to_strip)
+    i = 0
     for i, c in enumerate(string):
         if c not in to_strip:
             break
