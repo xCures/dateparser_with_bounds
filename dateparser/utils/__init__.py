@@ -338,7 +338,9 @@ def re_split_with_bounds(regex, string):
             cur_start,
             cur_end
         )
-    raise Exception(f"Infinite loop? {result} <|{regex}|> <<{raw_string}>>")
+    warnings.warn(f"Infinite loop? {result} <|{regex}|> <<{raw_string}>>")
+    return result
+    #raise Exception(f"Infinite loop? {result} <|{regex}|> <<{raw_string}>>")
 
 
 def split_with_bounds(string, splitter):
@@ -373,7 +375,9 @@ def split_with_bounds(string, splitter):
             cur_start,
             cur_end
         )
-    raise Exception(f"Infinite loop? {result} <|{splitter}|> <<{raw_string}>>")
+    warnings.warn(f"Infinite loop? {result} <|{splitter}|> <<{raw_string}>>")
+    return result
+    #raise Exception(f"Infinite loop? {result} <|{splitter}|> <<{raw_string}>>")
 
 def join_with_bounds(sep, strings, where_from = "?"):
     if len(strings) == 0:
