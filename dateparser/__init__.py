@@ -1,4 +1,4 @@
-__version__ = '1.2.99' # Bumped from 1.1.9 because now short-circuits search for strings with len<6. Avoid 1.2.0 because upstream took it.
+__version__ = '1.2.999' # Bumped from 1.1.9 because now short-circuits search for strings with len<6. Avoid 1.2.0 because upstream took it.
 
 from .date import DateDataParser
 from .conf import apply_settings
