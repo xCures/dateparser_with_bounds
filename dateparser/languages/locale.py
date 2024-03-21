@@ -209,9 +209,10 @@ class Locale:
                     and self.shortname not in word_joint_unsupported_languages
                 ):
                     translated_chunk.append(dictionary.get_with_bounds(current_and_next_joined))
-                    original_chunk.append(
-                        self._join_chunk([original_tokens[i], original_tokens[i + 1]], settings=settings)
-                    )
+                    if i < last_token_index:
+                        original_chunk.append(self._join_chunk([original_tokens[i], original_tokens[i + 1]], settings=settings))
+                    else:
+                        original_chunk.append(original_tokens[i])
                     skip_next_token = True
                 elif word in dictionary and word not in dashes:
                     translated_chunk.append(dictionary.get_with_bounds(word))
